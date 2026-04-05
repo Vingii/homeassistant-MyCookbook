@@ -153,6 +153,39 @@ class MyCookbookApiClient:
         except aiohttp.ClientError as err:
             raise MyCookbookApiError(f"Request failed: {err}") from err
 
+    async def _post(self, path: str, json: dict) -> Any:
+        url = f"{self._base_url}{path}"
+        try:
+            async with self._session.post(
+                url, headers=self._headers, json=json
+            ) as resp:
+                if resp.status == 401:
+                    raise MyCookbookApiError("Invalid API key", status=401)
+                if resp.status not in (200, 201):
+                    raise MyCookbookApiError(
+                        f"API returned {resp.status}", status=resp.status
+                    )
+                return await resp.json()
+        except aiohttp.ClientConnectorError as err:
+            raise MyCookbookApiError(f"Cannot connect: {err}") from err
+        except aiohttp.ClientError as err:
+            raise MyCookbookApiError(f"Request failed: {err}") from err
+
+    async def _delete(self, path: str) -> None:
+        url = f"{self._base_url}{path}"
+        try:
+            async with self._session.delete(url, headers=self._headers) as resp:
+                if resp.status == 401:
+                    raise MyCookbookApiError("Invalid API key", status=401)
+                if resp.status not in (200, 204):
+                    raise MyCookbookApiError(
+                        f"API returned {resp.status}", status=resp.status
+                    )
+        except aiohttp.ClientConnectorError as err:
+            raise MyCookbookApiError(f"Cannot connect: {err}") from err
+        except aiohttp.ClientError as err:
+            raise MyCookbookApiError(f"Request failed: {err}") from err
+
     async def async_validate_auth(self) -> bool:
         """Validate auth by fetching tags (lightweight endpoint)."""
         await self._get("/api/tags")
@@ -198,3 +231,21 @@ class MyCookbookApiClient:
     async def async_get_tags(self) -> list[str]:
         """Fetch all tags."""
         return await self._get("/api/tags")
+
+    async def async_add_planned_meal(
+        self, recipe_guid: str, meal_date: date, from_fridge: bool = False
+    ) -> PlannedMeal:
+        """Add a meal to the planner."""
+        data = await self._post(
+            "/api/planner",
+            {
+                "recipeGuid": recipe_guid,
+                "date": meal_date.isoformat(),
+                "fromFridge": from_fridge,
+            },
+        )
+        return PlannedMeal.from_dict(data)
+
+    async def async_delete_planned_meal(self, meal_id: int) -> None:
+        """Delete a planned meal by ID."""
+        await self._delete(f"/api/planner/{meal_id}")

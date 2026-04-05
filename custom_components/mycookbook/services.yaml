@@ -32,3 +32,42 @@ get_recipe_detail:
       example: "550e8400-e29b-41d4-a716-446655440000"
       selector:
         text:
+
+add_planned_meal:
+  name: Add Planned Meal
+  description: Add a recipe to the meal planner for a specific date.
+  fields:
+    recipe_guid:
+      name: Recipe GUID
+      description: The GUID of the recipe to plan, obtained from search_recipes.
+      required: true
+      example: "550e8400-e29b-41d4-a716-446655440000"
+      selector:
+        text:
+    date:
+      name: Date
+      description: The date to plan the meal for (YYYY-MM-DD).
+      required: true
+      example: "2026-04-08"
+      selector:
+        text:
+    from_fridge:
+      name: From Fridge
+      description: Whether ingredients will come from the fridge or needs to be cooked (default).
+      example: false
+      selector:
+        boolean:
+
+delete_planned_meal:
+  name: Delete Planned Meal
+  description: Remove a planned meal from the planner by its ID (obtained from sensor attributes).
+  fields:
+    meal_id:
+      name: Meal ID
+      description: The integer ID of the planned meal entry.
+      required: true
+      example: 42
+      selector:
+        number:
+          min: 1
+          mode: box

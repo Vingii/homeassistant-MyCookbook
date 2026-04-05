@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import voluptuous as vol
 
+from homeassistant.components.frontend import async_register_built_in_panel, async_remove_panel
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
@@ -87,6 +88,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             ],
         }
 
+    async def handle_add_planned_meal(call: ServiceCall) -> ServiceResponse:
+        client = _get_client(hass)
+        try:
+            from datetime import date as _date
+            meal_date = _date.fromisoformat(call.data["date"])
+            meal = await client.async_add_planned_meal(
+                recipe_guid=call.data["recipe_guid"],
+                meal_date=meal_date,
+                from_fridge=call.data.get("from_fridge", False),
+            )
+        except (MyCookbookApiError, ValueError) as err:
+            return {"error": str(err)}
+        # Refresh coordinator so sensors reflect the new meal
+        for coord in hass.data[DOMAIN].values():
+            await coord.async_request_refresh()
+        return {
+            "id": meal.id,
+            "recipe_name": meal.recipe_name,
+            "date": meal.date.isoformat(),
+        }
+
+    async def handle_delete_planned_meal(call: ServiceCall) -> ServiceResponse:
+        client = _get_client(hass)
+        try:
+            await client.async_delete_planned_meal(call.data["meal_id"])
+        except MyCookbookApiError as err:
+            return {"error": str(err)}
+        for coord in hass.data[DOMAIN].values():
+            await coord.async_request_refresh()
+        return {"deleted": True}
+
     hass.services.async_register(
         DOMAIN,
         "search_recipes",
@@ -109,6 +141,39 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         supports_response=SupportsResponse.ONLY,
     )
 
+    hass.services.async_register(
+        DOMAIN,
+        "add_planned_meal",
+        handle_add_planned_meal,
+        schema=vol.Schema(
+            {
+                vol.Required("recipe_guid"): cv.string,
+                vol.Required("date"): cv.string,
+                vol.Optional("from_fridge", default=False): cv.boolean,
+            }
+        ),
+        supports_response=SupportsResponse.ONLY,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        "delete_planned_meal",
+        handle_delete_planned_meal,
+        schema=vol.Schema({vol.Required("meal_id"): vol.Coerce(int)}),
+        supports_response=SupportsResponse.ONLY,
+    )
+
+    panel_url = f"{entry.data[CONF_API_URL]}?token={entry.data[CONF_API_KEY]}"
+    async_register_built_in_panel(
+        hass,
+        component_name="iframe",
+        sidebar_title="MyCookbook",
+        sidebar_icon="mdi:chef-hat",
+        frontend_url_path="mycookbook",
+        config={"url": panel_url},
+        require_admin=False,
+    )
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -117,8 +182,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
+        async_remove_panel(hass, "mycookbook")
         hass.data[DOMAIN].pop(entry.entry_id)
         if not hass.data[DOMAIN]:
-            hass.services.async_remove(DOMAIN, "search_recipes")
-            hass.services.async_remove(DOMAIN, "get_recipe_detail")
+            for svc in ("search_recipes", "get_recipe_detail", "add_planned_meal", "delete_planned_meal"):
+                hass.services.async_remove(DOMAIN, svc)
     return unload_ok
