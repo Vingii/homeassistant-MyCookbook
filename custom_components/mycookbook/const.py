@@ -8,7 +8,4 @@ CONF_API_KEY = "api_key"
 DEFAULT_SCAN_INTERVAL = 30  # minutes
 
 # Coordinator data keys
-DATA_TODAY = "today"
-DATA_TOMORROW = "tomorrow"
-DATA_WEEK = "week"
-DATA_NEXT_WEEK = "next_week"
+DATA_MEALS = "meals"

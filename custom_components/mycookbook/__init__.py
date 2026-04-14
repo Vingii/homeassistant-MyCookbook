@@ -14,7 +14,7 @@ from .api import MyCookbookApiClient, MyCookbookApiError
 from .const import CONF_API_KEY, CONF_API_URL, DOMAIN
 from .coordinator import MyCookbookCoordinator
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.CALENDAR]
 
 
 def _get_client(hass: HomeAssistant) -> MyCookbookApiClient:
